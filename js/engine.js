@@ -9,9 +9,11 @@ export class Engine {
     this.handlers = new Set();
     this.starting = null;
     this.queue = Promise.resolve();
+    this.multipv = 1;
+    this.cache = null;   // optional { get(key), set(key, value) }
   }
 
-  // Engine commands run one at a time so a cancelled game can't mix with the next one.
+  // Engine commands run one at a time so separate callers can't mix their output.
   _enqueue(fn) {
     const run = this.queue.then(fn, fn);
     this.queue = run.catch(() => {});
@@ -44,7 +46,7 @@ export class Engine {
       clearInterval(retry);
     }
     this.send('setoption name Hash value 32');
-    this.send('setoption name MultiPV value 2');
+    this.multipv = 1;
     await this.ready();
   }
 
@@ -83,40 +85,65 @@ export class Engine {
 
   newGame() {
     return this._enqueue(async () => {
+      await this.start();
       this.send('ucinewgame');
       await this.ready();
     });
   }
 
-  // Resolves with { bestmove, lines: [{ multipv, depth, type: 'cp'|'mate', score, pv: [uci] }] }.
-  // Scores are from the side to move's point of view.
-  analyse(fen, opts) {
-    return this._enqueue(() => this._analyse(fen, opts));
+  // Resolves with { bestmove, depth, lines: [{ multipv, depth, type: 'cp'|'mate', score, pv: [uci] }] }.
+  // Scores are from the side to move's point of view. onInfo(lines, depth) streams progress.
+  analyse(fen, opts = {}) {
+    return this._enqueue(async () => {
+      await this.start();
+      return this._analyse(fen, opts);
+    });
   }
 
-  _analyse(fen, { depth = 14, movetime = 3000 } = {}) {
+  // Cached single-line evaluation, used to check puzzle answers.
+  async quickEval(fen, depth = 12) {
+    const key = `${fen.split(' ').slice(0, 4).join(' ')}|q${depth}`;
+    if (this.cache) {
+      const hit = await this.cache.get(key);
+      if (hit) return hit;
+    }
+    const res = await this.analyse(fen, { depth, movetime: 2500, multipv: 1 });
+    if (this.cache && res.lines.length) this.cache.set(key, res);
+    return res;
+  }
+
+  _analyse(fen, { depth = 14, movetime = 3000, multipv = 3, infinite = false, onInfo = null } = {}) {
     return new Promise((resolve) => {
+      if (multipv !== this.multipv) {
+        this.send(`setoption name MultiPV value ${multipv}`);
+        this.multipv = multipv;
+      }
       const lines = {};
+      let lastDepth = 0;
       const h = (line) => {
         if (line.startsWith('info ') && line.includes(' pv ') && line.includes(' score ')) {
           if (line.includes(' lowerbound') || line.includes(' upperbound')) return;
           const info = parseInfo(line);
-          if (info) lines[info.multipv] = info;
+          if (!info) return;
+          if (info.multipv === 1 && info.depth > lastDepth) {
+            // A new depth started: drop lines from older depths so they don't mix.
+            for (const k of Object.keys(lines)) if (lines[k].depth < info.depth - 1) delete lines[k];
+            lastDepth = info.depth;
+          }
+          lines[info.multipv] = info;
+          if (onInfo && info.multipv === Object.keys(lines).length) onInfo(sorted(lines), lastDepth);
         } else if (line.startsWith('bestmove')) {
           clearTimeout(guard);
           this.handlers.delete(h);
           const best = line.split(' ')[1];
-          resolve({
-            bestmove: best && best !== '(none)' ? best : null,
-            lines: Object.keys(lines).sort((a, b) => a - b).map((k) => lines[k]),
-          });
+          resolve({ bestmove: best && best !== '(none)' ? best : null, depth: lastDepth, lines: sorted(lines) });
         }
       };
       // Safety net in case the engine ignores the time limit.
-      const guard = setTimeout(() => this.send('stop'), movetime + 5000);
+      const guard = infinite ? null : setTimeout(() => this.send('stop'), movetime + 5000);
       this.handlers.add(h);
       this.send('position fen ' + fen);
-      this.send(`go depth ${depth} movetime ${movetime}`);
+      this.send(infinite ? `go depth ${depth}` : `go depth ${depth} movetime ${movetime}`);
     });
   }
 
@@ -126,6 +153,10 @@ export class Engine {
     this.starting = null;
     this.handlers.clear();
   }
+}
+
+function sorted(lines) {
+  return Object.keys(lines).sort((a, b) => a - b).map((k) => lines[k]);
 }
 
 function parseInfo(line) {

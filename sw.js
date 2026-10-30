@@ -1,19 +1,29 @@
 // Offline cache for the app shell and the engine. Bump VERSION when files change.
-const VERSION = 'blundercheck-v3';
+const VERSION = 'blundercheck-v4';
 const ASSETS = [
   './',
   './index.html',
   './app.css',
   './manifest.webmanifest',
+  './data/openings.json',
   './js/app.js',
   './js/analysis.js',
   './js/board.js',
   './js/chesscom.js',
   './js/engine.js',
+  './js/explain.js',
   './js/graph.js',
+  './js/guided.js',
   './js/insights.js',
+  './js/lichess.js',
+  './js/motifs.js',
+  './js/openings.js',
   './js/pgn.js',
+  './js/pgnexport.js',
+  './js/solver.js',
   './js/store.js',
+  './js/sync.js',
+  './js/training.js',
   './vendor/chess.js',
   './vendor/pieces.svg',
   './vendor/stockfish/stockfish-19-lite-single.js',
@@ -37,7 +47,7 @@ self.addEventListener('activate', (event) => {
 
 // App code: network first so updates show up right away, cache when offline.
 // Libraries and the engine (vendor/) never change for a given version: cache first.
-// Chess.com API calls are not intercepted.
+// Chess.com and Lichess API calls are not intercepted.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);

@@ -9,6 +9,13 @@ export function findGameUrl(text) {
   return m ? { url: m[0], id: m[1] } : null;
 }
 
+export function gameSource(headers) {
+  const site = (headers.Site || '') + (headers.Link || '');
+  if (/lichess/i.test(site)) return 'lichess';
+  if (/chess\.com/i.test(site)) return 'chess.com';
+  return 'pgn';
+}
+
 export function looksLikePgn(text) {
   const t = String(text || '');
   return /\[\s*\w+\s+"/.test(t) || /(^|\s)1\.\s*[a-hNBRQKO]/.test(t);
@@ -99,6 +106,7 @@ export function parseGame(text) {
 export function gameId(game) {
   const h = game.headers;
   if (h.Link) return h.Link;
+  if (/lichess\.org\/[a-zA-Z0-9]{8}/.test(h.Site || '')) return h.Site.replace('http://', 'https://').slice(0, 28);
   const key = [h.Site, h.Date, h.White, h.Black, h.Result, game.moves.map((m) => m.uci).join('')].join('|');
   let hash = 2166136261;
   for (let i = 0; i < key.length; i++) {

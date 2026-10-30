@@ -34,6 +34,7 @@ function simplify(g, user) {
     : ['agreed', 'repetition', 'stalemate', 'insufficient', '50move', 'timevsinsufficient'].includes(me.result) ? 'draw'
     : 'loss';
   return {
+    source: 'chess.com',
     url: g.url,
     pgn: g.pgn,
     endTime: g.end_time ? g.end_time * 1000 : null,

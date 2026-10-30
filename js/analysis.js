@@ -1,9 +1,16 @@
-// Turns engine evaluations into a move-by-move review: classifications, accuracy,
-// game phases, clock usage and a short explanation for every error.
+// Turns engine evaluations into a move-by-move review: grades, accuracy, phases, clock use,
+// opening book, opponent threats and an explanation for every error.
+// Raw engine output (evals) is stored with each game so reports can be rebuilt without the engine.
 
-import { Chess } from '../vendor/chess.js';
+import { Chess, DEFAULT_POSITION } from '../vendor/chess.js';
+import { explainError, playLine } from './explain.js';
+import { nullMoveFen } from './motifs.js';
+import { identifyOpening, epd } from './openings.js';
+
+export const REPORT_VERSION = 2;
 
 export const CLASSES = {
+  book:       { label: 'Book',       glyph: '≡' },
   great:      { label: 'Great',      glyph: '!' },
   best:       { label: 'Best',       glyph: '★' },
   excellent:  { label: 'Excellent',  glyph: '✓' },
@@ -14,7 +21,7 @@ export const CLASSES = {
   blunder:    { label: 'Blunder',    glyph: '??' },
   forced:     { label: 'Forced',     glyph: '→' },
 };
-export const CLASS_ORDER = ['great', 'best', 'excellent', 'good', 'inaccuracy', 'mistake', 'miss', 'blunder'];
+export const CLASS_ORDER = ['book', 'great', 'best', 'excellent', 'good', 'inaccuracy', 'mistake', 'miss', 'blunder'];
 export const ERROR_CLASSES = new Set(['inaccuracy', 'mistake', 'miss', 'blunder']);
 
 export const PRESETS = {
@@ -22,18 +29,6 @@ export const PRESETS = {
   balanced: { depth: 14, movetime: 2500, label: 'Balanced' },
   deep:     { depth: 18, movetime: 6000, label: 'Deep' },
 };
-
-export const CATEGORY_TEXT = {
-  hung:          'Left material hanging',
-  tactic:        'Walked into a tactic',
-  missed_tactic: 'Missed a winning tactic',
-  missed_mate:   'Missed a checkmate',
-  allowed_mate:  'Allowed a checkmate',
-  positional:    'Positional error',
-  endgame:       'Endgame technique',
-};
-
-const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
 // Win probability (0–100) for the side to move, Lichess formula.
 export function winPercent(line) {
@@ -47,35 +42,16 @@ export function moveAccuracy(loss) {
   return Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669));
 }
 
-function sideToMove(fen) {
-  return fen.split(' ')[1];
-}
+const sideToMove = (fen) => fen.split(' ')[1];
 
-// Evaluation from White's point of view, for display and the graph.
-function whiteEval(ev, fen) {
-  const stm = sideToMove(fen);
-  const line = ev.lines[0];
+// Converts a line's score (side-to-move view) to White's view.
+export function lineToWhite(line, stm) {
   const sign = stm === 'w' ? 1 : -1;
   if (line.type === 'mate') {
     if (line.score === 0) return { type: 'mate', score: 0, winner: stm === 'w' ? 'b' : 'w' };
     return { type: 'mate', score: sign * line.score };
   }
   return { type: 'cp', score: sign * line.score };
-}
-
-function material(fen) {
-  let w = 0, b = 0;
-  for (const ch of fen.split(' ')[0]) {
-    const v = VALUE[ch.toLowerCase()];
-    if (!v) continue;
-    if (ch === ch.toUpperCase()) w += v; else b += v;
-  }
-  return { w, b };
-}
-
-function balance(fen, color) {
-  const m = material(fen);
-  return color === 'w' ? m.w - m.b : m.b - m.w;
 }
 
 function pieceCount(fen) {
@@ -92,78 +68,192 @@ function phaseOf(fen) {
   return 'middlegame';
 }
 
-// Plays up to n engine moves (UCI) from a position; returns positions, SAN and the moves.
-export function playLine(fen, pv, n = 6) {
-  const c = new Chess(fen);
-  const fens = [fen], sans = [], moves = [];
-  for (const u of (pv || []).slice(0, n)) {
-    try {
-      const m = c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
-      fens.push(c.fen()); sans.push(m.san); moves.push(m);
-    } catch {
-      break;
-    }
-  }
-  return { fens, sans, moves };
-}
-
-function settled(fens, color) {
-  const k = fens.length - 1;
-  return balance(fens[k - (k % 2)], color);
-}
-
-export async function evaluatePosition(engine, fen, opts) {
+export async function evaluatePosition(engine, fen, { depth, movetime, multipv = 3, cache = null } = {}) {
   const c = new Chess(fen);
   const legal = c.moves().length;
   if (c.isCheckmate()) return { terminal: 'mate', legal: 0, lines: [{ type: 'mate', score: 0, pv: [] }] };
   if (legal === 0 || c.isStalemate() || c.isInsufficientMaterial()) {
     return { terminal: 'draw', legal, lines: [{ type: 'cp', score: 0, pv: [] }] };
   }
-  const res = await engine.analyse(fen, opts);
-  const lines = res.lines.length ? res.lines : [{ type: 'cp', score: 0, pv: res.bestmove ? [res.bestmove] : [] }];
-  return { legal, lines };
+  const key = `${epd(fen)}|d${depth}|m${multipv}`;
+  if (cache) {
+    const hit = await cache.get(key);
+    if (hit) return { ...hit, legal };
+  }
+  const res = await engine.analyse(fen, { depth, movetime, multipv });
+  const lines = res.lines.map((l) => ({ type: l.type, score: l.score, pv: l.pv.slice(0, 12) }));
+  const out = { legal, depth: res.depth, lines: lines.length ? lines : [{ type: 'cp', score: 0, pv: res.bestmove ? [res.bestmove] : [] }] };
+  if (cache && lines.length) cache.set(key, { depth: out.depth, lines: out.lines });
+  return out;
 }
 
-export async function analyzeGame(game, engine, { preset = 'balanced', userColor = 'w', onProgress, signal } = {}) {
-  const opts = PRESETS[preset] || PRESETS.balanced;
-  await engine.start();
-  await engine.newGame();
+function classify(game, evals) {
+  return game.moves.map((m, i) => {
+    const before = evals[i], after = evals[i + 1];
+    const winBefore = winPercent(before.lines[0]);
+    const winAfter = 100 - winPercent(after.lines[0]);
+    const loss = Math.max(0, winBefore - winAfter);
+    const bestUci = before.lines[0] && before.lines[0].pv[0];
+    const gap = before.lines[1] ? winBefore - winPercent(before.lines[1]) : 0;
+    return { winBefore, winAfter, loss, bestUci, isBest: bestUci === m.uci, gap };
+  });
+}
+
+// opts: { preset, userColor, onProgress, signal, cache, resume, onCheckpoint, openings }
+export async function analyzeGame(game, engine, opts = {}) {
+  const { preset = 'balanced', userColor = 'w', onProgress, signal, cache, resume, onCheckpoint, openings } = opts;
+  const P = PRESETS[preset] || PRESETS.balanced;
+  const check = () => { if (signal && signal.aborted) throw new DOMException('Analysis cancelled', 'AbortError'); };
   const fens = [game.startFen, ...game.moves.map((m) => m.after)];
-  const evals = [];
+  const evals = resume && resume.length === fens.length ? resume.slice() : new Array(fens.length).fill(null);
   const t0 = performance.now();
+  const progress = (phase, done, total) => onProgress && onProgress({ phase, done, total, elapsed: performance.now() - t0 });
+
+  await engine.newGame();
+  let done = evals.filter(Boolean).length;
   for (let i = 0; i < fens.length; i++) {
-    if (signal && signal.aborted) throw new DOMException('Analysis cancelled', 'AbortError');
-    evals.push(await evaluatePosition(engine, fens[i], opts));
-    if (onProgress) onProgress({ done: i + 1, total: fens.length, elapsed: performance.now() - t0 });
+    if (evals[i]) continue;
+    check();
+    evals[i] = await evaluatePosition(engine, fens[i], { depth: P.depth, movetime: P.movetime, cache });
+    done++;
+    progress('scan', done, fens.length);
+    if (onCheckpoint && done % 10 === 0) await onCheckpoint(evals);
   }
-  return buildReport(game, evals, userColor, preset);
+
+  const book = openings && epd(game.startFen) === epd(DEFAULT_POSITION)
+    ? identifyOpening(openings, game.moves.map((m) => m.after))
+    : { eco: '', name: '', bookPlies: 0 };
+
+  // Second pass: re-check suspected errors and "only move" candidates deeper.
+  const first = classify(game, evals);
+  const deepen = new Set();
+  first.forEach((x, i) => {
+    if (i < book.bookPlies) return;
+    if (x.loss >= 5) { deepen.add(i); deepen.add(i + 1); } else if (x.isBest && x.gap >= 15) deepen.add(i);
+  });
+  const recheck = [...deepen].filter((k) => !evals[k].terminal && !evals[k].deep);
+  for (let n = 0; n < recheck.length; n++) {
+    check();
+    const k = recheck[n];
+    evals[k] = { ...(await evaluatePosition(engine, fens[k], { depth: P.depth + 4, movetime: P.movetime * 2, cache })), deep: true };
+    progress('deep', n + 1, recheck.length);
+  }
+
+  // Opponent threats before each error (null-move search).
+  const threats = {};
+  const second = classify(game, evals);
+  const errors = second.map((x, i) => (x.loss >= 5 && i >= book.bookPlies ? i : -1)).filter((i) => i >= 0);
+  for (let n = 0; n < errors.length; n++) {
+    check();
+    const i = errors[n];
+    const nf = nullMoveFen(fens[i]);
+    if (nf) {
+      const r = await evaluatePosition(engine, nf, { depth: 12, movetime: 1500, multipv: 1, cache });
+      if (r.lines[0] && r.lines[0].pv.length) threats[i] = r.lines[0];
+    }
+    progress('threats', n + 1, errors.length);
+  }
+
+  const extra = { book, threats };
+  return { report: buildReport(game, evals, userColor, preset, extra), evals, extra };
 }
 
-function explainError(p, before, after, mover) {
-  const l0 = before.lines[0];
-  const a0 = after.lines[0];
-  const fenBefore = p.fenBefore, fenAfter = p.fenAfter;
+export function buildReport(game, evals, userColor, preset, extra = {}) {
+  const tc = game.timeControl;
+  const base = tc && !tc.daily ? tc.base : null;
+  const inc = (tc && tc.inc) || 0;
+  const lastClock = { w: base, b: base };
+  const book = extra.book || { eco: '', name: '', bookPlies: 0 };
+  const threats = extra.threats || {};
+  const cls0 = classify(game, evals);
+  const plies = [];
 
-  if (a0 && a0.type === 'mate' && a0.score > 0 && !(l0.type === 'mate' && l0.score < 0)) {
-    return { cat: 'allowed_mate', mateIn: a0.score, line: playLine(fenAfter, a0.pv, 6).sans, lineFrom: 'after' };
+  for (let i = 0; i < game.moves.length; i++) {
+    const m = game.moves[i];
+    const before = evals[i];
+    const { winBefore, winAfter, loss, bestUci, isBest, gap } = cls0[i];
+
+    let cls;
+    if (i < book.bookPlies) cls = 'book';
+    else if (before.legal === 1) cls = 'forced';
+    else if (isBest) cls = 'best';
+    else if (loss < 2) cls = 'excellent';
+    else if (loss < 5) cls = 'good';
+    else if (loss < 10) cls = 'inaccuracy';
+    else if (loss < 20) cls = 'mistake';
+    else cls = 'blunder';
+
+    // Allowing a short forced mate is always worth flagging, even in a lost position.
+    const afterLine = evals[i + 1].lines[0];
+    const allowsMate = afterLine && afterLine.type === 'mate' && afterLine.score > 0 && afterLine.score <= 3;
+    const alreadyMated = before.lines[0] && before.lines[0].type === 'mate' && before.lines[0].score < 0;
+    if (allowsMate && !alreadyMated && ['excellent', 'good', 'inaccuracy'].includes(cls)) cls = winBefore >= 20 ? 'blunder' : 'mistake';
+
+    if (cls === 'best' && before.lines[1]) {
+      const prev = game.moves[i - 1];
+      const recapture = prev && prev.captured && prev.to === m.to && m.captured;
+      if (gap >= 20 && winBefore >= 30 && winBefore <= 97 && !recapture) cls = 'great';
+    }
+
+    let spent = null;
+    const clock = m.clock;
+    if (clock != null && lastClock[m.color] != null) {
+      spent = Math.max(0, lastClock[m.color] + inc - clock);
+      lastClock[m.color] = clock;
+    }
+
+    const stm = m.color;
+    const alts = before.lines.slice(0, 3).map((l) => {
+      const pl = playLine(m.before, l.pv, 1);
+      return pl.sans[0] ? { uci: l.pv[0], san: pl.sans[0], eval: lineToWhite(l, stm) } : null;
+    }).filter(Boolean);
+    const bestLine = playLine(m.before, before.lines[0] ? before.lines[0].pv : [], 8);
+
+    plies.push({
+      i,
+      color: m.color,
+      moveNo: +m.before.split(' ')[5] || Math.floor(i / 2) + 1,
+      san: m.san, uci: m.uci, from: m.from, to: m.to, captured: m.captured,
+      fenBefore: m.before, fenAfter: m.after,
+      winBefore, winAfter, loss, gap,
+      acc: moveAccuracy(loss),
+      cls,
+      best: bestUci ? { uci: bestUci, san: bestLine.sans[0] || bestUci } : null,
+      bestLine: bestLine.sans,
+      bestPv: before.lines[0] ? before.lines[0].pv.slice(0, 8) : [],
+      alts,
+      phase: phaseOf(m.before),
+      critical: gap >= 20 && cls !== 'book',
+      clock, spent,
+    });
   }
-  if (l0 && l0.type === 'mate' && l0.score > 0 && !(a0 && a0.type === 'mate' && a0.score < 0)) {
-    return { cat: 'missed_mate', mateIn: l0.score, line: playLine(fenBefore, l0.pv, 6).sans, lineFrom: 'before' };
+
+  for (let k = 1; k < plies.length; k++) {
+    const p = plies[k], prev = plies[k - 1];
+    if ((p.cls === 'inaccuracy' || p.cls === 'mistake') && prev.loss >= 10 && prev.cls !== 'book' && p.winBefore >= 50) p.cls = 'miss';
   }
-  const start = balance(fenBefore, mover);
-  const reply = playLine(fenAfter, a0 ? a0.pv : [], 4);
-  const afterBal = settled(reply.fens, mover);
-  const drop = start - afterBal;
-  if (drop >= 2) {
-    const first = reply.moves[0];
-    return { cat: first && first.captured ? 'hung' : 'tactic', amount: drop, line: reply.sans, lineFrom: 'after' };
+
+  for (const p of plies) {
+    if (ERROR_CLASSES.has(p.cls)) p.why = explainError(p, evals[p.i], evals[p.i + 1], threats[p.i]);
+    if (p.clock != null && base) p.lowClock = p.clock < Math.max(10, base * 0.1);
   }
-  const bestLine = playLine(fenBefore, l0 ? l0.pv : [], 4);
-  const gain = settled(bestLine.fens, mover) - start;
-  if (gain >= 2 && gain - (afterBal - start) >= 2) {
-    return { cat: 'missed_tactic', amount: gain, line: bestLine.sans, lineFrom: 'before' };
-  }
-  return { cat: p.phase === 'endgame' ? 'endgame' : 'positional', line: playLine(fenBefore, l0 ? l0.pv : [], 6).sans, lineFrom: 'before' };
+
+  const positions = evals.map((ev, i) => {
+    const fen = i === 0 ? game.startFen : game.moves[i - 1].after;
+    const stm = sideToMove(fen);
+    const w = winPercent(ev.lines[0]);
+    return { eval: lineToWhite(ev.lines[0], stm), winWhite: stm === 'w' ? w : 100 - w };
+  });
+
+  return {
+    version: REPORT_VERSION,
+    preset,
+    userColor,
+    opening: book,
+    plies,
+    positions,
+    summary: summarize(game, plies, positions, userColor),
+  };
 }
 
 function mean(xs) {
@@ -177,96 +267,11 @@ function gameAccuracy(accs) {
   return (m + h) / 2;
 }
 
-export function buildReport(game, evals, userColor, preset) {
-  const tc = game.timeControl;
-  const base = tc && !tc.daily ? tc.base : null;
-  const inc = (tc && tc.inc) || 0;
-  const lastClock = { w: base, b: base };
-  const plies = [];
-
-  for (let i = 0; i < game.moves.length; i++) {
-    const m = game.moves[i];
-    const before = evals[i], after = evals[i + 1];
-    const mover = m.color;
-    const winBefore = winPercent(before.lines[0]);
-    const winAfter = 100 - winPercent(after.lines[0]);
-    const loss = Math.max(0, winBefore - winAfter);
-    const bestUci = before.lines[0] && before.lines[0].pv[0];
-    const second = before.lines[1];
-
-    let cls;
-    if (before.legal === 1) cls = 'forced';
-    else if (bestUci === m.uci) cls = 'best';
-    else if (loss < 2) cls = 'excellent';
-    else if (loss < 5) cls = 'good';
-    else if (loss < 10) cls = 'inaccuracy';
-    else if (loss < 20) cls = 'mistake';
-    else cls = 'blunder';
-
-    if (cls === 'best' && second) {
-      const gap = winBefore - winPercent(second);
-      const prev = game.moves[i - 1];
-      const recapture = prev && prev.captured && prev.to === m.to && m.captured;
-      if (gap >= 20 && winBefore >= 30 && winBefore <= 97 && !recapture) cls = 'great';
-    }
-
-    let spent = null, clock = m.clock;
-    if (clock != null && lastClock[mover] != null) {
-      spent = Math.max(0, lastClock[mover] + inc - clock);
-      lastClock[mover] = clock;
-    }
-
-    const bestLine = playLine(m.before, before.lines[0] ? before.lines[0].pv : [], 6);
-    plies.push({
-      i,
-      color: mover,
-      moveNo: +m.before.split(' ')[5] || Math.floor(i / 2) + 1,
-      san: m.san, uci: m.uci, from: m.from, to: m.to,
-      fenBefore: m.before, fenAfter: m.after,
-      winBefore, winAfter, loss,
-      acc: moveAccuracy(loss),
-      cls,
-      best: bestUci ? { uci: bestUci, san: bestLine.sans[0] || bestUci } : null,
-      bestLine: bestLine.sans,
-      phase: phaseOf(m.before),
-      clock, spent,
-    });
-  }
-
-  // A "miss" is failing to punish the opponent's mistake.
-  for (let k = 1; k < plies.length; k++) {
-    const p = plies[k], prev = plies[k - 1];
-    if ((p.cls === 'inaccuracy' || p.cls === 'mistake') && prev.loss >= 10 && p.winBefore >= 50) p.cls = 'miss';
-  }
-
-  for (const p of plies) {
-    if (ERROR_CLASSES.has(p.cls)) p.why = explainError(p, evals[p.i], evals[p.i + 1], p.color);
-    if (p.clock != null && base) p.lowClock = p.clock < Math.max(10, base * 0.1);
-  }
-
-  const positions = evals.map((ev, i) => {
-    const fen = i === 0 ? game.startFen : game.moves[i - 1].after;
-    const stm = sideToMove(fen);
-    const w = winPercent(ev.lines[0]);
-    return { eval: whiteEval(ev, fen), winWhite: stm === 'w' ? w : 100 - w };
-  });
-
-  const report = {
-    version: 1,
-    preset,
-    userColor,
-    plies,
-    positions,
-    summary: summarize(game, plies, positions, userColor),
-  };
-  return report;
-}
-
 export function summarize(game, plies, positions, userColor) {
   const out = { players: {} };
   for (const color of ['w', 'b']) {
     const mine = plies.filter((p) => p.color === color);
-    const counted = mine.filter((p) => p.cls !== 'forced');
+    const counted = mine.filter((p) => p.cls !== 'forced' && p.cls !== 'book');
     const counts = Object.fromEntries(CLASS_ORDER.map((c) => [c, 0]));
     for (const p of mine) if (counts[p.cls] != null) counts[p.cls]++;
     const phases = {};
@@ -274,17 +279,31 @@ export function summarize(game, plies, positions, userColor) {
       const xs = counted.filter((p) => p.phase === ph).map((p) => p.acc);
       phases[ph] = xs.length ? { acc: gameAccuracy(xs), moves: xs.length } : null;
     }
-    const cats = {};
-    for (const p of mine) if (p.why) cats[p.why.cat] = (cats[p.why.cat] || 0) + 1;
-    const spentErrors = mine.filter((p) => ['mistake', 'blunder', 'miss'].includes(p.cls));
+    const cats = {}, themes = {}, motifs = {}, lostPieces = {};
+    const serious = mine.filter((p) => ['mistake', 'blunder', 'miss'].includes(p.cls));
+    for (const p of mine) {
+      if (!p.why) continue;
+      cats[p.why.cat] = (cats[p.why.cat] || 0) + 1;
+      if (p.cls === 'inaccuracy') continue;
+      themes[p.why.theme] = (themes[p.why.theme] || 0) + 1;
+      const mt = p.why.motifs && p.why.motifs[0] && p.why.motifs[0].type;
+      if (mt) motifs[mt] = (motifs[mt] || 0) + 1;
+      if (p.why.lostPiece) lostPieces[p.why.lostPiece] = (lostPieces[p.why.lostPiece] || 0) + 1;
+    }
+    const critical = mine.filter((p) => (p.critical || serious.includes(p)) && p.spent != null);
     out.players[color] = {
       accuracy: gameAccuracy(counted.map((p) => p.acc)),
       counts,
       phases,
       categories: cats,
-      rushedErrors: spentErrors.filter((p) => p.spent != null && p.spent < 3).length,
-      lowClockErrors: spentErrors.filter((p) => p.lowClock).length,
+      themes,
+      motifs,
+      lostPieces,
+      errorMoves: serious.map((p) => p.moveNo),
+      rushedErrors: serious.filter((p) => p.spent != null && p.spent < 3).length,
+      lowClockErrors: serious.filter((p) => p.lowClock).length,
       avgSpent: mean(mine.filter((p) => p.spent != null).map((p) => p.spent)),
+      criticalSpent: mean(critical.map((p) => p.spent)),
       moves: mine.length,
     };
   }
@@ -295,9 +314,14 @@ export function summarize(game, plies, positions, userColor) {
   out.result = userWon ? 'win' : userLost ? 'loss' : res === '1/2-1/2' ? 'draw' : 'unknown';
 
   const userWins = positions.map((p) => (userColor === 'w' ? p.winWhite : 100 - p.winWhite));
-  let peak = { win: 0, ply: 0 };
-  userWins.forEach((w, k) => { if (w > peak.win) peak = { win: w, ply: k }; });
+  let peak = { win: 0, ply: 0 }, trough = { win: 100, ply: 0 };
+  userWins.forEach((w, k) => {
+    if (w > peak.win) peak = { win: w, ply: k };
+    if (k > 0 && w < trough.win) trough = { win: w, ply: k };
+  });
   out.peak = peak;
+  out.trough = trough;
   out.blewWin = peak.win >= 85 && out.result !== 'win' && out.result !== 'unknown';
+  out.savedLoss = trough.win <= 15 && (out.result === 'win' || out.result === 'draw');
   return out;
 }

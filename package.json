@@ -1,0 +1,15 @@
+{
+  "name": "blundercheck",
+  "private": true,
+  "type": "module",
+  "description": "Stockfish review for Chess.com and Lichess games, as an iPhone home-screen web app",
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "test:engine": "node tests/run.mjs --engine",
+    "serve": "python serve.py",
+    "build:openings": "node tools/build-openings.mjs"
+  },
+  "devDependencies": {
+    "stockfish": "19.0.1"
+  }
+}
