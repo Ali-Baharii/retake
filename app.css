@@ -58,6 +58,8 @@
 }
 
 * { box-sizing: border-box; }
+/* No double-tap zoom when tapping through moves quickly (pinch zoom still works). */
+html, body, * { touch-action: manipulation; }
 html, body { margin: 0; }
 body {
   background: var(--bg);

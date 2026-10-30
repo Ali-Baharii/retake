@@ -1,5 +1,5 @@
 // Offline cache for the app shell and the engine. Bump VERSION when files change.
-const VERSION = 'blundercheck-v2';
+const VERSION = 'blundercheck-v3';
 const ASSETS = [
   './',
   './index.html',
