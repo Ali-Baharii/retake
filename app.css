@@ -272,8 +272,10 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13
 .move-info .line b { color: var(--ink); }
 
 .movelist {
-  display: grid; grid-template-columns: 38px 1fr 1fr; background: var(--surface);
-  border: 1px solid var(--hair); border-radius: var(--radius); overflow: hidden;
+  display: grid; grid-template-columns: 38px 1fr 1fr; align-content: start; background: var(--surface);
+  border: 1px solid var(--hair); border-radius: var(--radius);
+  position: relative; max-height: 240px; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .movelist .no { padding: 7px 0 7px 10px; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; background: var(--surface-2); }
 .movelist .mv {

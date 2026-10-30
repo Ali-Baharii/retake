@@ -532,11 +532,22 @@ function renderMoves() {
 
   renderGraph($('#mv-graph'), { positions: r.positions, plies: r.plies, cur: k, userColor: r.userColor, onSelect: setCur, height: 64 });
 
-  $$('#movelist .mv').forEach((b) => {
+  const list = $('#movelist');
+  let current = null;
+  list.querySelectorAll('.mv').forEach((b) => {
     const on = +b.dataset.k === k;
     b.setAttribute('aria-current', String(on));
-    if (on && state.view === 'review') b.scrollIntoView({ block: 'nearest' });
+    if (on) current = b;
   });
+  // Scroll only inside the move list. scrollIntoView would also scroll the page,
+  // pushing the board off screen on every move.
+  if (!current) {
+    list.scrollTop = 0;
+  } else {
+    const top = current.offsetTop, bottom = top + current.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = Math.max(0, top - 8);
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight + 8;
+  }
 }
 
 async function changeColor(color) {
