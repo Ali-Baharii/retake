@@ -17,7 +17,7 @@ import { startGuided, guidedMoments } from './guided.js';
 import { exportPgn } from './pgnexport.js';
 import { createQueue, createWakeLock } from './sync.js';
 
-const APP_VERSION = '2.0';
+const APP_VERSION = '2.1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -399,6 +399,24 @@ async function maybeAutoSync(force = false) {
   if (fresh.length) {
     queue.add(fresh.map((g) => ({ key: g.url, pgn: g.pgn, color: g.color, label: `vs ${g.opponent}` })));
     toast(`Analyzing ${plural(fresh.length, 'new game')} in the background.`);
+  }
+}
+
+// A pre-analyzed demo game (kept out of history and Insights) so new visitors see the coach instantly.
+async function openSample() {
+  hideError();
+  try {
+    const rec = await fetch('./data/sample-game.json').then((r) => { if (!r.ok) throw new Error(); return r.json(); });
+    rec.analyzedAt = Date.now();
+    const existing = await games.get(rec.id).catch(() => null);
+    if (existing && existing.notes) rec.notes = existing.notes;
+    await games.put(rec);
+    if (!existing) await savePuzzlesFor(rec);
+    updateBadges();
+    await openRecord(rec.id, 'coach');
+    toast('Sample game: you play White. Try the guided review.');
+  } catch {
+    showError("Couldn't load the sample game. Check your connection and try again.");
   }
 }
 
@@ -1201,10 +1219,10 @@ function setSetting(key, value) {
 async function backup() {
   const data = await exportAll();
   const json = JSON.stringify(data);
-  const name = `blundercheck-backup-${dayKey()}.json`;
+  const name = `retake-backup-${dayKey()}.json`;
   const file = new File([json], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: 'Blundercheck backup' }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.share({ files: [file], title: 'Retake backup' }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(file);
@@ -1232,7 +1250,7 @@ async function restore(file) {
 /* ---------- onboarding ---------- */
 
 const SLIDES = [
-  { art: '♞', title: 'Your games, coached', body: 'Blundercheck runs Stockfish on your phone to grade every move, explain your mistakes in plain words and show the better idea.' },
+  { art: '♞', title: 'Your games, coached', body: 'Retake runs Stockfish on your phone to grade every move, explain your mistakes in plain words and show the better idea.' },
   { art: '⇩', title: 'Getting games in', body: 'Add your Chess.com or Lichess username in Settings to list your latest games, or copy a game\'s PGN or link and tap Paste.' },
   { art: '♜', title: 'Try first, then learn why', body: 'The guided review puts you back in the key positions. Find the move yourself, then see what the engine and the tactic were.' },
   { art: '↻', title: 'Mistakes become training', body: 'Every mistake becomes a puzzle in the Train tab and comes back on a schedule until you know it. Nothing leaves your device.' },
@@ -1280,6 +1298,7 @@ function bind() {
     e.target.value = '';
   });
   $('#btn-refresh').addEventListener('click', () => { renderRecent(true); maybeAutoSync(true); });
+  $('#btn-sample').addEventListener('click', openSample);
 
   $('#btn-back').addEventListener('click', () => show('home'));
   $('#btn-cancel').addEventListener('click', () => {
@@ -1370,7 +1389,7 @@ function handleLaunchHash() {
 async function rebuildIndex(force = false) {
   const [all, idx] = await Promise.all([games.all().catch(() => []), gameIndex.all().catch(() => [])]);
   const have = new Set(idx.map((e) => e.id));
-  const todo = all.filter((r) => r.report && (force || !have.has(r.id)));
+  const todo = all.filter((r) => r.report && !r.sample && (force || !have.has(r.id)));
   for (const r of todo) await gameIndex.put(indexEntry(r)).catch(() => {});
   // Resume games whose analysis was interrupted.
   const partial = all.filter((r) => !r.report && r.partial && r.pgn);

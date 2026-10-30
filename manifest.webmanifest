@@ -1,7 +1,7 @@
 {
-  "name": "Blundercheck",
-  "short_name": "Blundercheck",
-  "description": "Stockfish review for your Chess.com games: blunders, best moves and how to improve.",
+  "name": "Retake",
+  "short_name": "Retake",
+  "description": "Replay your chess mistakes until they stick: a free coach for your Chess.com and Lichess games.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

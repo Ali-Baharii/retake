@@ -3,14 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Blundercheck</title>
-  <meta name="description" content="Stockfish coach for your Chess.com and Lichess games: find your mistakes, understand them, and train them away.">
+  <title>Retake: replay your chess mistakes until they stick</title>
+  <meta name="description" content="A free coach for your Chess.com and Lichess games. Find your mistakes, replay them, learn the tactic behind them, and train them with spaced repetition. Stockfish runs on your phone; no account, nothing uploaded.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Retake">
+  <meta property="og:title" content="Retake: replay your chess mistakes until they stick">
+  <meta property="og:description" content="Free, open-source coach for your Chess.com and Lichess games. Try your mistakes again, learn the tactic behind them, and train them with spaced repetition. Runs on your phone.">
+  <meta property="og:url" content="https://ali-baharii.github.io/retake/">
+  <meta property="og:image" content="https://ali-baharii.github.io/retake/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Retake explains a chess mistake: after Nxe5, Qg5 forks the knight and the pawn on g2.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Retake: replay your chess mistakes until they stick">
+  <meta name="twitter:description" content="Free, open-source coach for your Chess.com and Lichess games. Runs Stockfish on your phone.">
+  <meta name="twitter:image" content="https://ali-baharii.github.io/retake/og-image.png">
   <meta name="theme-color" content="#f2f4f5" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#101315" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Blundercheck">
+  <meta name="apple-mobile-web-app-title" content="Retake">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -24,8 +37,8 @@
   <section id="view-home" class="view">
     <header class="topbar">
       <div>
-        <h1 class="brand">Blundercheck</h1>
-        <p class="muted small">Your games, reviewed and turned into training</p>
+        <h1 class="brand">Retake</h1>
+        <p class="muted small">Replay your mistakes until they stick</p>
       </div>
     </header>
 
@@ -46,6 +59,7 @@
         <button id="btn-analyze-text" class="btn primary" type="button">Analyze</button>
       </div>
       <p id="home-error" class="error" role="alert" hidden></p>
+      <button id="btn-sample" class="link sample-link" type="button">New here? Try a sample game →</button>
     </div>
 
     <div id="queue-card" class="card queue" hidden></div>
@@ -227,9 +241,16 @@
       <ol class="steps small">
         <li><b>Paste:</b> in Chess.com or Lichess, open a game → Share → copy PGN (or the link) → <i>Paste game &amp; analyze</i>.</li>
         <li><b>Recent games:</b> add your username above; your latest games are listed on the Analyze tab.</li>
-        <li><b>Share sheet (optional):</b> an iOS Shortcut can add Blundercheck to the Share menu. See the README on GitHub.</li>
+        <li><b>Share sheet (optional):</b> an iOS Shortcut can add Retake to the Share menu. See the README on GitHub.</li>
       </ol>
       <button id="btn-tour" class="link" type="button">Show the welcome tour again</button>
+    </div>
+
+    <div class="card support">
+      <h3>Support Retake</h3>
+      <p class="muted small">Retake is free, with no ads and no account, and it will stay that way. If it helped your chess, you can support the developer.</p>
+      <a class="btn primary wide" href="https://paypal.me/XetroVortex" target="_blank" rel="noopener">Donate with PayPal</a>
+      <a class="btn ghost wide" href="https://github.com/Ali-Baharii/retake/issues/new" target="_blank" rel="noopener">Report a bug or suggest a feature</a>
     </div>
 
     <div class="card">
@@ -244,7 +265,8 @@
     </div>
 
     <div class="card about small muted">
-      <p><b>Blundercheck</b> runs Stockfish 19 (lite, GPLv3) entirely on your phone. Nothing is uploaded. Move parsing by chess.js (BSD-2); pieces by Cburnett (CC BY-SA 3.0); opening names from lichess-org/chess-openings (CC0). Not affiliated with Chess.com or Lichess.</p>
+      <p><b>Retake</b> runs Stockfish 19 (lite, GPLv3) entirely on your phone. Nothing is uploaded. Move parsing by chess.js (BSD-2); pieces by Cburnett (CC BY-SA 3.0); opening names from lichess-org/chess-openings (CC0). Not affiliated with Chess.com or Lichess.</p>
+      <p>Open source (GPL-3.0): <a href="https://github.com/Ali-Baharii/retake" target="_blank" rel="noopener">github.com/Ali-Baharii/retake</a></p>
       <p id="app-version"></p>
     </div>
   </section>

@@ -342,6 +342,10 @@ textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13
   font-weight: 800; display: grid; place-items: center;
 }
 .btn.wide { width: 100%; margin-top: 12px; }
+a.btn { text-decoration: none; }
+a.btn.ghost { color: var(--ink); }
+.support .btn.wide + .btn.wide { margin-top: 8px; }
+.sample-link { justify-self: center; }
 .btn.sm { min-height: 34px; padding: 6px 12px; font-size: 0.85rem; border-radius: 10px; }
 .field { display: grid; gap: 6px; margin-top: 10px; font-size: 0.9rem; color: var(--ink-2); }
 select {

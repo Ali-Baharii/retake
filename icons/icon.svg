@@ -12,7 +12,9 @@
         <path d="M7.6363543,7.4375 C7.6363543,8.16235779 7.44641868,8.74997112 7.21212121,8.74997112 C6.97782375,8.74997112 6.78788812,8.16235779 6.78788812,7.4375 C6.78788812,6.71264221 6.97782375,6.12502888 7.21212121,6.12502888 C7.44641868,6.12502888 7.6363543,6.71264221 7.6363543,7.4375 L7.6363543,7.4375 Z"
               id="Shape" stroke-width="1.499967" fill="#000000"
               transform="translate(7.212121, 7.437500) rotate(30.000728) translate(-7.212121, -7.437500) "/>
-    </g></g>
-<circle cx="30.2" cy="9.8" r="5.3" fill="#d23c3c" stroke="#ffffff" stroke-width="0.9"/>
-<text x="30.2" y="12.15" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="6.6" fill="#ffffff">??</text>
+    </g>
+</g>
+<circle cx="30.2" cy="9.8" r="5.3" fill="#d23c3c" stroke="#fff" stroke-width="0.901"/>
+    <path d="M31.90 7.77 A2.65 2.65 0 1 1 29.29 7.31" fill="none" stroke="#fff" stroke-width="1.06" stroke-linecap="round"/>
+    <polygon points="30.97,6.70 28.46,6.31 29.29,8.61" fill="#fff"/>
 </svg>

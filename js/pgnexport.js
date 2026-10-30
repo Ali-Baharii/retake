@@ -20,7 +20,7 @@ export function exportPgn(record) {
   const r = record.report;
   const h = { ...(record.headers || {}) };
   if (r.opening && r.opening.name) { h.Opening = r.opening.name; if (r.opening.eco) h.ECO = r.opening.eco; }
-  h.Annotator = 'Blundercheck (Stockfish 19)';
+  h.Annotator = 'Retake (Stockfish 19)';
   const keys = [...HEADER_ORDER.filter((k) => h[k] != null), ...Object.keys(h).filter((k) => !HEADER_ORDER.includes(k))];
   const head = keys.map((k) => `[${k} "${String(h[k]).replace(/"/g, "'")}"]`).join('\n');
 

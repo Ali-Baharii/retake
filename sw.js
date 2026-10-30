@@ -1,11 +1,12 @@
 // Offline cache for the app shell and the engine. Bump VERSION when files change.
-const VERSION = 'blundercheck-v4';
+const VERSION = 'retake-v5';
 const ASSETS = [
   './',
   './index.html',
   './app.css',
   './manifest.webmanifest',
   './data/openings.json',
+  './data/sample-game.json',
   './js/app.js',
   './js/analysis.js',
   './js/board.js',

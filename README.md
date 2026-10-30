@@ -1,10 +1,22 @@
-# Blundercheck
+# Retake
 
-A home-screen web app that reviews your Chess.com and Lichess games with Stockfish 19,
-right on the phone, and turns your mistakes into training. Live at
-https://ali-baharii.github.io/blundercheck/
+**Replay your chess mistakes until they stick.**
 
-Nothing is uploaded anywhere. The engine runs on the device and everything is stored there.
+A free coach for your Chess.com and Lichess games. Retake finds your mistakes, has you play
+the key moments again, explains the tactic behind each one in plain words, and brings your
+mistakes back as puzzles until you stop making them. Stockfish 19 runs on your phone: no
+account, no ads, nothing uploaded.
+
+**Try it:** https://ali-baharii.github.io/retake/. On iPhone, open it in Safari and tap Share → Add to Home Screen.
+New here? Tap *Try a sample game* on the first screen.
+
+| Coach: you try first | Then you learn why | Your mistakes come back |
+|---|---|---|
+| ![The coach catching a wrong move](docs/coach-wrong-move.png) | ![Explanation after solving](docs/coach-reveal.png) | ![Spaced-repetition training](docs/train.png) |
+
+| Every move graded | Patterns across your games | |
+|---|---|---|
+| ![Move review with best-move arrow](docs/moves.png) | ![Insights](docs/insights-issues.png) | ![Tactics behind your mistakes](docs/insights-patterns.png) |
 
 ## What it does
 
@@ -67,10 +79,10 @@ come first; 1200–1800, multi-move tactics and conversion; above, critical mome
 - **PGN files** from the Files app.
 - **Optional Share-sheet shortcut:** iPhone doesn't let home-screen web apps appear in the
   Share sheet, but a Shortcut can.
-  1. In Shortcuts, create *Blundercheck*.
+  1. In Shortcuts, create *Retake*.
   2. Turn on *Show in Share Sheet* (receives Text and URLs).
   3. Add **URL Encode** (Shortcut Input).
-  4. Add a **Text** action: `https://ali-baharii.github.io/blundercheck/#text=` followed by the encoded text.
+  4. Add a **Text** action: `https://ali-baharii.github.io/retake/#text=` followed by the encoded text.
   5. Add **Open URLs**.
 
   This opens Safari, which keeps its own saved data separate from the home-screen app.
@@ -99,6 +111,8 @@ python serve.py                 # local server at http://localhost:8765
 node tests/run.mjs              # fast tests (tactics, openings, spaced repetition, PGN export)
 npm install && npm run test:engine   # adds full Stockfish analysis tests
 node tools/build-openings.mjs   # rebuilds data/openings.json
+node tools/build-sample.mjs     # rebuilds the pre-analyzed sample game (needs npm install)
+node tools/build-images.mjs     # writes HTML for the icon and social preview (render with a headless browser)
 ```
 
 Files:
@@ -118,7 +132,15 @@ js/pgn.js, js/pgnexport.js      PGN in and out
 After changing files, bump `VERSION` in `sw.js` so installed apps pick up the update
 (they show an "Update" banner).
 
+## Feedback and support
+
+- Found a bug or have an idea? [Open an issue](https://github.com/Ali-Baharii/retake/issues/new).
+- Retake is free and will stay that way. If it helped your chess, you can
+  [support the developer on PayPal](https://paypal.me/XetroVortex).
+
 ## Credits and licenses
+
+Retake is free software under the GNU General Public License v3 (`LICENSE`).
 
 - Stockfish 19 / Stockfish.js by the Stockfish developers and Nathan Rugg, GPLv3
   (`vendor/stockfish/COPYING.txt`, source: https://github.com/nmrugg/stockfish.js)

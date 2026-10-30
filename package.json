@@ -1,5 +1,5 @@
 {
-  "name": "blundercheck",
+  "name": "retake",
   "private": true,
   "type": "module",
   "description": "Stockfish review for Chess.com and Lichess games, as an iPhone home-screen web app",

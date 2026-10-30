@@ -1,4 +1,4 @@
-"""Local test server for Blundercheck: python serve.py, then open http://localhost:8765"""
+"""Local test server for Retake: python serve.py, then open http://localhost:8765"""
 import http.server
 import mimetypes
 import socketserver

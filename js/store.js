@@ -25,7 +25,7 @@ function openDb() {
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
-      req.onblocked = () => reject(new Error('Close other Blundercheck tabs and try again.'));
+      req.onblocked = () => reject(new Error('Close other Retake tabs and try again.'));
     });
   }
   return dbPromise;
@@ -103,11 +103,11 @@ export const evalCache = {
 
 export async function exportAll() {
   const [g, p, m] = await Promise.all([games.all(), puzzles.all(), metaStore.all()]);
-  return { app: 'blundercheck', version: 2, exportedAt: new Date().toISOString(), settings: loadSettings(), games: g, puzzles: p, meta: m };
+  return { app: 'retake', version: 2, exportedAt: new Date().toISOString(), settings: loadSettings(), games: g, puzzles: p, meta: m };
 }
 
 export async function importAll(data) {
-  if (!data || data.app !== 'blundercheck') throw new Error("This file isn't a Blundercheck backup.");
+  if (!data || !['retake', 'blundercheck'].includes(data.app)) throw new Error("This file isn't a Retake backup.");
   if (Array.isArray(data.games)) await games.putMany(data.games);
   if (Array.isArray(data.puzzles)) await puzzles.putMany(data.puzzles);
   if (Array.isArray(data.meta)) await metaStore.putMany(data.meta);
