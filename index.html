@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Blundercheck</title>
+  <meta name="description" content="Stockfish review for your Chess.com games: blunders, best moves and how to improve.">
+  <meta name="theme-color" content="#f2f4f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101315" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Blundercheck">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+<main id="app">
+
+  <!-- ANALYZE -->
+  <section id="view-home" class="view">
+    <header class="topbar">
+      <div>
+        <h1 class="brand">Blundercheck</h1>
+        <p class="muted small">Stockfish review for your Chess.com games</p>
+      </div>
+    </header>
+
+    <div class="card hero">
+      <button id="btn-paste" class="btn primary big" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h2V5a1 1 0 0 1 1-1Zm0 2v1h6V6H9Z" fill="currentColor"/></svg>
+        Paste game &amp; analyze
+      </button>
+      <p class="muted small">In the Chess.com app, open a finished game, tap <b>Share</b>, then <b>Copy PGN</b> (a copied game link works too if your username is set).</p>
+      <div class="row-btns">
+        <label class="btn ghost" for="file-pgn">Open PGN file</label>
+        <input type="file" id="file-pgn" accept=".pgn,.txt,text/plain,application/x-chess-pgn,application/vnd.chess-pgn" hidden>
+        <button id="btn-manual" class="btn ghost" type="button">Type or paste</button>
+      </div>
+      <div id="manual" class="manual" hidden>
+        <label for="pgn-input" class="sr-only">PGN or game link</label>
+        <textarea id="pgn-input" rows="6" placeholder="Paste PGN text or a chess.com game link" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+        <button id="btn-analyze-text" class="btn primary" type="button">Analyze</button>
+      </div>
+      <p id="home-error" class="error" role="alert" hidden></p>
+    </div>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Recent Chess.com games</h2>
+        <button id="btn-refresh" class="link" type="button">Refresh</button>
+      </div>
+      <div id="recent" class="list"></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h2>Analyzed games</h2></div>
+      <div id="history" class="list"></div>
+    </section>
+  </section>
+
+  <!-- REVIEW -->
+  <section id="view-review" class="view" hidden>
+    <header class="topbar sticky">
+      <button id="btn-back" class="back" type="button" aria-label="Back to games">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Games
+      </button>
+      <div id="rv-title" class="rv-title"></div>
+      <span class="topbar-spacer"></span>
+    </header>
+    <div id="rv-meta" class="meta muted small"></div>
+
+    <div id="rv-progress" class="card progress" hidden>
+      <div class="progress-head"><strong id="pg-label">Starting the engine…</strong><span id="pg-eta" class="muted small"></span></div>
+      <div class="bar"><div id="pg-bar" class="bar-fill"></div></div>
+      <button id="btn-cancel" class="link" type="button">Cancel</button>
+    </div>
+    <p id="rv-error" class="error card" role="alert" hidden></p>
+
+    <div id="rv-body" hidden>
+      <div class="segmented" role="tablist">
+        <button type="button" data-pane="report" role="tab" aria-selected="true">Report</button>
+        <button type="button" data-pane="moves" role="tab" aria-selected="false">Moves</button>
+      </div>
+
+      <div id="pane-report" class="pane">
+        <div id="rv-accuracy" class="acc-row"></div>
+        <div class="card">
+          <div id="rv-counts"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Game flow</h3><span class="muted small">Tap to jump to a move</span></div>
+          <div id="rv-graph" class="graph"></div>
+        </div>
+        <div class="card">
+          <h3>How to improve</h3>
+          <div id="rv-tips" class="tips"></div>
+        </div>
+        <div class="card">
+          <h3>Key moments</h3>
+          <div id="rv-moments" class="moments"></div>
+        </div>
+        <div class="card">
+          <h3>Accuracy by phase</h3>
+          <div id="rv-phases"></div>
+        </div>
+        <div class="card" id="rv-time-card">
+          <h3>Clock</h3>
+          <div id="rv-time"></div>
+        </div>
+        <div class="color-switch">
+          <span class="muted small">You played</span>
+          <div class="seg-mini" role="group" aria-label="Your color">
+            <button type="button" data-color="w">White</button>
+            <button type="button" data-color="b">Black</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="pane-moves" class="pane" hidden>
+        <div class="board-wrap">
+          <div id="evalbar" class="evalbar" aria-hidden="true"></div>
+          <div id="board" class="board"></div>
+        </div>
+        <div class="nav-row">
+          <button type="button" class="nav-btn" data-nav="first" aria-label="First move">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5l-8 7 8 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="nav-btn" data-nav="prev" aria-label="Previous move">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="nav-btn" data-nav="next" aria-label="Next move">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="nav-btn" data-nav="last" aria-label="Last move">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 5l8 7-8 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="nav-btn" data-nav="flip" aria-label="Flip board">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v14m0 0-3-3m3 3 3-3M17 20V6m0 0-3 3m3-3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div id="move-info" class="card move-info" aria-live="polite"></div>
+        <div id="mv-graph" class="graph"></div>
+        <div id="movelist" class="movelist"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSIGHTS -->
+  <section id="view-insights" class="view" hidden>
+    <header class="topbar"><div><h1 class="brand">Insights</h1><p class="muted small">Patterns across every game you've analyzed</p></div></header>
+    <div id="insights"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view" hidden>
+    <header class="topbar"><div><h1 class="brand">Settings</h1></div></header>
+
+    <div class="card">
+      <label for="set-username"><h3>Chess.com username</h3></label>
+      <p class="muted small">Used to load your recent games, find shared game links, and know which side you played. Only public game data is read.</p>
+      <input id="set-username" type="text" placeholder="e.g. magnuscarlsen" autocomplete="username" autocapitalize="off" spellcheck="false">
+    </div>
+
+    <div class="card">
+      <h3>Analysis strength</h3>
+      <div class="radio-list" role="radiogroup" aria-label="Analysis strength">
+        <label><input type="radio" name="preset" value="fast" id="preset-fast"><span><b>Fast</b><span class="muted small">Depth 11 · about 30–60 s per game</span></span></label>
+        <label><input type="radio" name="preset" value="balanced" id="preset-balanced"><span><b>Balanced</b><span class="muted small">Depth 14 · about 1–2 min per game (recommended)</span></span></label>
+        <label><input type="radio" name="preset" value="deep" id="preset-deep"><span><b>Deep</b><span class="muted small">Depth 18 · several minutes per game</span></span></label>
+      </div>
+      <p class="muted small">Keep the app open while it analyzes; iPhone pauses web apps in the background.</p>
+    </div>
+
+    <div class="card">
+      <h3>Getting games in</h3>
+      <ol class="steps small">
+        <li><b>Copy and paste (works everywhere):</b> Chess.com app → open the game → Share → Copy PGN → open Blundercheck → <i>Paste game &amp; analyze</i>.</li>
+        <li><b>Recent games:</b> with your username set, your latest Chess.com games appear on the Analyze tab. Tap one.</li>
+        <li><b>Share sheet (optional):</b> set up the iOS Shortcut described in the README so "Blundercheck" appears when you tap Share. It opens the game in Safari.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>Saved data</h3>
+      <p class="muted small" id="storage-info">Analyses are stored only on this device.</p>
+      <button id="btn-clear" class="btn danger" type="button">Delete all analyzed games</button>
+    </div>
+
+    <div class="card about small muted">
+      <p><b>Blundercheck</b> runs Stockfish 19 (lite, GPLv3) entirely on your phone. Move parsing by chess.js (BSD-2). Pieces by Cburnett, CC BY-SA 3.0, via cm-chessboard. Not affiliated with Chess.com.</p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Main">
+  <button type="button" data-view="home" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 3h2l-1 4h-2l1 7H10l1-7H9L8 6h2L9 3Zm-3 15h12v3H6z" fill="currentColor"/></svg><span>Analyze</span></button>
+  <button type="button" data-view="insights">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7m6 7H2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Insights</span></button>
+  <button type="button" data-view="settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.6 5-.1-3-2.1-.5-.6-1.4 1.1-1.9-2.1-2.1-1.9 1.1-1.4-.6L13 3h-3l-.5 2.1-1.4.6-1.9-1.1-2.1 2.1 1.1 1.9-.6 1.4L2.5 10.5v3l2.1.5.6 1.4-1.1 1.9 2.1 2.1 1.9-1.1 1.4.6.5 2.1h3l.5-2.1 1.4-.6 1.9 1.1 2.1-2.1-1.1-1.9.6-1.4 2.2-.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>Settings</span></button>
+</nav>
+
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
